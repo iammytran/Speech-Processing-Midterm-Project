@@ -188,7 +188,6 @@ def tokenize_with_punctuation(text):
 
 def phonemize_with_punctuation(text):
     tokens = tokenize_with_punctuation(text)
-    print(tokens)
 
     result = []
     for token in tokens:

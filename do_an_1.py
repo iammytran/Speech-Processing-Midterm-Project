@@ -105,14 +105,24 @@ class VietnameseSyllable:
 
     def get_initial_consonant_and_rhyme(self, syllable):
         if syllable[:3] == 'ngh':
+            if syllable[3] not in {'i', 'ê', 'e'} or syllable[3:5] not in {'iê', 'ia'} :
+                return None, None
             return syllable[:3], syllable[3:]
         elif syllable[:2] in {'ph', 'th', 'gi', 'ch', 'tr', 'nh', 'kh', 'ng', 'gh'}:
+            if syllable[:2] in {'gh'} and not (syllable[2] in {'i', 'ê', 'e'} or syllable[2:4] in {'iê', 'ia'}):
+                return None, None
             return syllable[:2], syllable[2:]
         elif syllable[0] in {'b', 'm', 'v', 't', 'đ', 'n', 'd', 'r', 'x', 's', 'l', 'k', 'q', 'c', 'g', 'h'}:
+            if syllable[:1] in {'q'} and syllable[1] not in {'u'}:
+                return None, None
+            if  syllable[:1] in {'k'} and not (syllable[1] in {'i', 'ê', 'e'} or syllable[1:3] in {'iê', 'ia'}):
+                return None, None
             return syllable[0], syllable[1:]
-        return "", syllable
+        return '', syllable
 
     def get_glide_and_vowel(self, rhyme, initial_consonant):
+        if rhyme == None or initial_consonant == None:
+            return None, None
         if initial_consonant == 'q':
             return 'u', rhyme[1:]
         elif rhyme[:3] in {'uyê', 'uya'}:
@@ -122,7 +132,9 @@ class VietnameseSyllable:
         return '', rhyme
 
     def get_main_vowel_and_final_consonant(self, vowel):
-        if vowel[:2] in {'ươ', 'yê', 'iê', 'uô'}:
+        if vowel == None:
+            return None, None
+        if vowel[:2] in {'ươ', 'ưa', 'yê', 'iê', 'uô', 'ua', 'ya', 'ia'}:
             return vowel[:2], vowel[2:]
         main_vowel, final_consonant = vowel[:1], vowel[1:]
         return main_vowel, final_consonant
@@ -138,39 +150,40 @@ class VietnameseSyllable:
     
     def to_ipa(self):
         result = ""
-        if VIETNAMESE_IPA['INITIAL_CONSONANT'][self.initial_consonant]:
+        if self.initial_consonant is not None and VIETNAMESE_IPA['INITIAL_CONSONANT'][self.initial_consonant]:
             result += VIETNAMESE_IPA['INITIAL_CONSONANT'][self.initial_consonant]
         else:
-            print(f"Not found initial consonant for syllable: {self.syllable}")
-            return None
+            print(f"[ERROR] Invalid syllable: {self.syllable}")
+            return self.syllable
         
         # Glide
         if self.glide in VIETNAMESE_IPA['GLIDE']:
             result += VIETNAMESE_IPA['GLIDE'][self.glide]
         else:
-            print(f"Not found glide for syllable: {self.syllable}")
-            return None
+            print(f"[ERROR] Invalid syllable: {self.syllable}")
+            return self.syllable
 
         # Main vowel
-        if self.handle_main_vowel(self.main_vowel, self.final_consonant):
-            result += self.handle_main_vowel(self.main_vowel, self.final_consonant)
+        main_vowel = self.handle_main_vowel(self.main_vowel, self.final_consonant)
+        if main_vowel:
+            result += main_vowel
         else:
-            print(f"Not found main vowel for syllable: {self.syllable}")
-            return None
+            print(f"[ERROR] Invalid syllable: {self.syllable}")
+            return self.syllable
 
         # Final consonant
         if self.final_consonant in VIETNAMESE_IPA['FINAL_CONSONANT']:
             result += VIETNAMESE_IPA['FINAL_CONSONANT'][self.final_consonant]
         else:
-            print(f"Not found final consonant for syllable: {self.syllable}")
-            return None
+            print(f"[ERROR] Invalid syllable: {self.syllable}")
+            return self.syllable
 
         # Tone mark
         if hasattr(self, "tone_mark") and self.tone_mark is not None:
             result += self.tone_mark
         else:
-            print(f"Not found tone mark for syllable: {self.syllable}")
-            return None
+            print(f"[ERROR] Invalid syllable: {self.syllable}")
+            return self.syllable
         return result
        
     def handle_main_vowel(self, main_vowel, final_consonant):
@@ -193,10 +206,11 @@ def phonemize_with_punctuation(text):
     for token in tokens:
         if re.match(r"\w+", token):
             syllable = VietnameseSyllable(token)
+            syllable.info()
             syllable_ipa = syllable.to_ipa()
             result.append(syllable_ipa)
         else:
-            if result:
+            if result and token:
                 result[-1] = result[-1] + token
             else:
                 result.append(token)
@@ -206,7 +220,8 @@ def phonemize_with_punctuation(text):
 if __name__ == "__main__":
     # sentence = "Nếu biết rằng em đã có chồng, trời ơi người ấy có buồn không!"
     sentence = "Tôi anh ách lo lắng! Mái, nhanh nhách, rau, tay, quay, con!!"
-    sentence = "ong-óc mong móc móp, quyết, chuyện, anh, con, chuyện, oanh, ươn, enh"
+    sentence = "ong-óc mong móc móp, quyết, chuyện, anh, con, chuyện, oanh, ươn, nghang"
+    sentence = "ké, kiếm, kìa, kế thừa, khuya, káng, kháng"
     result = phonemize_with_punctuation(sentence)
 
     print("Câu gốc            : " + sentence)

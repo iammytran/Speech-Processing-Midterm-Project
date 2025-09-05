@@ -2,6 +2,7 @@ from do_an_1 import *
 
 from docx import Document
 import re
+from collections import defaultdict
 
 dict_file = "VDic_uni.docx"
 doc = Document(dict_file)
@@ -36,20 +37,16 @@ for word in words:
 print(f"Có {len(syllables)} âm tiết")
 
 # 3. process từng âm tiết -> nếu process dc thì thêm nó vào list [âm tiết TV], 0 thì thêm vào list [ko phải âm tiết TV]
-valid_syllables = []
-invalid_syllables = []
+valid_syllables = defaultdict(int)
+invalid_syllables = defaultdict(int)
 
-for syllable in syllables:
+for s in syllables:
     try:
-        print("======")
-        print("word: " + syllable)
-        print(VietnameseSyllable(syllable).info())
-        ipa = VietnameseSyllable(syllable).to_ipa()
-        valid_syllables.append((syllable, ipa))
-    except InvalidSyllableError:
-        invalid_syllables.append(syllable)
-    
-# if __name__ == "__main__":
-#     results = process_dict("viet_dict.docx")
-#     for word, ipa in results:
-#         print(f"{word} -> {ipa}")
+        ipa = VietnameseSyllable(s).to_ipa()
+        valid_syllables[s] +=1
+    except (ValueError, InvalidSyllableError) as e:  # 
+        # print(f"[WARN] Cannot convert: {word} ({e})")
+        invalid_syllables[s]+=1
+
+print(f"Số lượng âm tiết tiếng việt: {len(valid_syllables)}")
+print(f"Số lượng âm tiết không phải tiếng việt: {len(invalid_syllables)}")

@@ -68,6 +68,7 @@ TONE = {
 class InvalidSyllableError(Exception):
     pass
 
+
 class VietnameseSyllable:
     def __init__(self, syllable):
         self.syllable = syllable.lower()
@@ -80,21 +81,20 @@ class VietnameseSyllable:
         self.extract_components()
     
     def extract_components(self):
-        self.root_syllable = self.get_root_syllable(self.syllable)
-        self.tone_mark = self.get_tone_mark(self.syllable)
-        self.initial_consonant, rhyme = self.get_initial_consonant_and_rhyme(self.root_syllable)
-        self.glide, vowel = self.get_glide_and_vowel(rhyme, self.initial_consonant)
+        self.get_root_syllable()
+        self.tone_mark = self.get_tone_mark()
+        self.initial_consonant, rhyme = self.get_initial_consonant_and_rhyme()
+        self.glide, vowel = self.get_glide_and_vowel(rhyme)
         self.main_vowel, self.final_consonant =  self.get_main_vowel_and_final_consonant(vowel)
 
-    def get_root_syllable(self, syllable):
-        basic_syllable = ''
-        for c in syllable:
-            basic_syllable += ROOT_CHARS.get(c, c)
-        return basic_syllable
+    def get_root_syllable(self):
+        for c in self.syllable:
+            self.root_syllable += ROOT_CHARS.get(c, c)
 
-    def get_tone_mark(self, syllable):
+    # TODO: Refactor
+    def get_tone_mark(self):
         tone = ""
-        for c in syllable:
+        for c in self.syllable:
             for k, v in TONE.items():
                 if c in k:
                     tone += v
@@ -103,40 +103,125 @@ class VietnameseSyllable:
         elif len(tone) > 1:
             return max(tone)
 
-    def get_initial_consonant_and_rhyme(self, syllable):
-        if syllable[:3] == 'ngh':
-            if syllable[3] not in {'i', 'ê', 'e'} or syllable[3:5] not in {'iê', 'ia'} :
-                return None, None
-            return syllable[:3], syllable[3:]
-        elif syllable[:2] in {'ph', 'th', 'gi', 'ch', 'tr', 'nh', 'kh', 'ng', 'gh'}:
-            if syllable[:2] in {'gh'} and not (syllable[2] in {'i', 'ê', 'e'} or syllable[2:4] in {'iê', 'ia'}):
-                return None, None
-            return syllable[:2], syllable[2:]
-        elif syllable[0] in {'b', 'm', 'v', 't', 'đ', 'n', 'd', 'r', 'x', 's', 'l', 'k', 'q', 'c', 'g', 'h'}:
-            if syllable[:1] in {'q'} and syllable[1] not in {'u'}:
-                return None, None
-            if  syllable[:1] in {'k'} and not (syllable[1] in {'i', 'ê', 'e'} or syllable[1:3] in {'iê', 'ia'}):
-                return None, None
-            return syllable[0], syllable[1:]
-        return '', syllable
+    def get_initial_consonant_and_rhyme(self):
+        initials = sorted(VIETNAMESE_IPA['INITIAL_CONSONANT'].keys(), key=len, reverse=True)
+    
+        for ic in initials:
+            if self.root_syllable.startswith(ic):
+                return ic, self.root_syllable[len(ic):]   # trả về (phụ âm đầu, phần còn lại)
+        
+        # nếu không khớp gì thì coi như không có phụ âm đầu
+        return "", self.root_syllable
 
-    def get_glide_and_vowel(self, rhyme, initial_consonant):
-        if rhyme == None or initial_consonant == None:
-            return None, None
-        if initial_consonant == 'q':
-            return 'u', rhyme[1:]
-        elif rhyme[:3] in {'uyê', 'uya'}:
-            return 'u', rhyme[1:]
-        elif rhyme[:2] in {'uy', 'ui', 'uê', 'uâ', 'oa', 'oe', 'ua'}:
-            return rhyme[0], rhyme[1:]
-        return '', rhyme
+    def get_glide_and_vowel(self, rhyme):
+        """
+        Detect glide (âm đệm) trong tiếng Việt.
+        Rule:
+        - 'q' luôn đi với 'u' + âm chính
+        - 'u' là âm đệm chỉ khi theo sau là {y, i, ê, ơ, â, yê, ya}
+        - 'o' là âm đệm nếu theo sau là 1 âm chính hợp lệ (ví dụ a, e, ê)
+        """
+        if not rhyme:
+            return "", rhyme
+
+        # Rule cho 'q'
+        if self.initial_consonant == "q":
+            if rhyme.startswith("u"):
+                return "u", rhyme[1:]
+            else:
+                raise InvalidSyllableError(f"'q' chỉ hợp lệ khi đi với 'u': {self.syllable}")
+            
+        if rhyme[0] in {"u", "o"}:
+            # Chỉ coi là âm đệm nếu sau đó là nguyên âm hợp lệ
+            if rhyme[1:] and rhyme[1] in VIETNAMESE_IPA["MAIN_VOWEL"]:
+                # Âm đệm 'u'
+                if rhyme.startswith("u"):
+                    valid_after_u = {"y", "i", "ê", "ơ", "â", "yê", "ya"}
+                    for v in sorted(valid_after_u, key=len, reverse=True):  # check chuỗi dài trước
+                        if rhyme[1:].startswith(v):
+                            return "u", rhyme[1:]
+                    # Không hợp lệ
+                    return "", rhyme
+
+                # Âm đệm 'o'
+                if rhyme.startswith("o"):
+                    valid_after_o = {"a", "e"}
+                    if rhyme[1:] and rhyme[1] in valid_after_o:
+                        return "o", rhyme[1:]
+                    else:
+                        return "", rhyme
+
+        return "", rhyme
 
     def get_main_vowel_and_final_consonant(self, vowel):
-        if vowel == None:
-            return None, None
+        if not vowel:
+            return "", vowel
+        
+        main_vowels = sorted(VIETNAMESE_IPA['MAIN_VOWEL'].keys(), key=len, reverse=True)
+        for mv in main_vowels:
+            if vowel.startswith(mv):
+                return mv, vowel[len(mv):]
+
         if vowel[:2] in {'ươ', 'ưa', 'yê', 'iê', 'uô', 'ua', 'ya', 'ia'}:
             return vowel[:2], vowel[2:]
         main_vowel, final_consonant = vowel[:1], vowel[1:]
+        return "", vowel
+    
+    def get_main_vowel(self, rhyme: str):
+        """Detect the main vowel and return (main_vowel, leftover)."""
+        if not rhyme:
+            return "", rhyme
+
+        # Check the longest main vowels first
+        main_vowels = sorted(VIETNAMESE_IPA['MAIN_VOWEL'].keys(), key=len, reverse=True)
+        for mv in main_vowels:
+            if rhyme.startswith(mv):
+                return mv, rhyme[len(mv):]
+
+        # No match → not a valid main vowel
+        return "", rhyme
+
+
+    def get_final_consonant(self, leftover: str):
+        """Detect final consonant from leftover, return (final_consonant, leftover)."""
+        if not leftover:
+            return "", leftover
+
+        # Check longest consonants first (nh, ng, ch before n, c, etc.)
+        finals = sorted(VIETNAMESE_IPA['FINAL_CONSONANT'].keys(), key=len, reverse=True)
+        for fc in finals:
+            if leftover.startswith(fc):
+                return fc, leftover[len(fc):]
+
+        # No match → invalid leftover
+        return "", leftover
+    
+    def validate_final_consonant(self, main_vowel: str, final_consonant: str) -> bool:
+        """Check if a final consonant is valid for a given main vowel."""
+        if not final_consonant:
+            return True  # no final consonant → always valid
+
+        # special rules
+        if final_consonant in {"nh", "ch"} and main_vowel not in {"i", "ê", "a"}:
+            return False
+        if final_consonant == "o" and main_vowel not in {"a", "e"}:
+            return False
+        if final_consonant in {"y"} and main_vowel not in {"a", "â"}:
+            return False
+
+        return True
+
+    def get_main_vowel_and_final_consonant(self, rhyme: str):
+        """Split rhyme into main vowel and final consonant."""
+        main_vowel, leftover = self.get_main_vowel(rhyme)
+        final_consonant, leftover = self.get_final_consonant(leftover)
+
+        if leftover:  # still characters left = invalid rhyme
+            raise ValueError(f"Invalid rhyme: {rhyme}, leftover={leftover}")
+        
+        if not self.validate_final_consonant(main_vowel, final_consonant):
+            raise ValueError(f"Invalid combination: main_vowel={main_vowel}, final_consonant={final_consonant}")
+
         return main_vowel, final_consonant
 
     def info(self):
@@ -150,7 +235,7 @@ class VietnameseSyllable:
     
     def to_ipa(self):
         result = ""
-        if self.initial_consonant is not None and VIETNAMESE_IPA['INITIAL_CONSONANT'][self.initial_consonant]:
+        if VIETNAMESE_IPA['INITIAL_CONSONANT'][self.initial_consonant]:
             result += VIETNAMESE_IPA['INITIAL_CONSONANT'][self.initial_consonant]
         else:
             print(f"[ERROR] Invalid syllable: {self.syllable}")

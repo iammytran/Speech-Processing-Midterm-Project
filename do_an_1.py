@@ -137,24 +137,46 @@ class VietnameseSyllable:
         print("Phụ âm cuối        :", self.final_consonant)
     
     def to_ipa(self):
-        try:
-            result = ""
-            if VIETNAMESE_IPA['INITIAL_CONSONANT'][self.initial_consonant]:
-                result += VIETNAMESE_IPA['INITIAL_CONSONANT'][self.initial_consonant]
-            else:
-                return None
+        result = ""
+        if VIETNAMESE_IPA['INITIAL_CONSONANT'][self.initial_consonant]:
+            result += VIETNAMESE_IPA['INITIAL_CONSONANT'][self.initial_consonant]
+        else:
+            print(f"Not found initial consonant for syllable: {self.syllable}")
+            return None
+        
+        # Glide
+        if self.glide in VIETNAMESE_IPA['GLIDE']:
             result += VIETNAMESE_IPA['GLIDE'][self.glide]
+        else:
+            print(f"Not found glide for syllable: {self.syllable}")
+            return None
+
+        # Main vowel
+        if self.handle_main_vowel(self.main_vowel, self.final_consonant):
             result += self.handle_main_vowel(self.main_vowel, self.final_consonant)
+        else:
+            print(f"Not found main vowel for syllable: {self.syllable}")
+            return None
+
+        # Final consonant
+        if self.final_consonant in VIETNAMESE_IPA['FINAL_CONSONANT']:
             result += VIETNAMESE_IPA['FINAL_CONSONANT'][self.final_consonant]
+        else:
+            print(f"Not found final consonant for syllable: {self.syllable}")
+            return None
+
+        # Tone mark
+        if hasattr(self, "tone_mark") and self.tone_mark is not None:
             result += self.tone_mark
-            return result
-        except ValueError:
-            raise InvalidSyllableError(f"Not a valid Vietnamese syllable: {self.syllable}")
-    
+        else:
+            print(f"Not found tone mark for syllable: {self.syllable}")
+            return None
+        return result
+       
     def handle_main_vowel(self, main_vowel, final_consonant):
         entry = VIETNAMESE_IPA["MAIN_VOWEL"].get(main_vowel)
         if not entry:
-            raise ValueError(f"Unknown main vowel: {main_vowel}")
+            return None
         
         for finals, ipa in entry['final_consonant'].items():
             if finals == (None,) or final_consonant in finals:
@@ -185,7 +207,7 @@ def phonemize_with_punctuation(text):
 if __name__ == "__main__":
     # sentence = "Nếu biết rằng em đã có chồng, trời ơi người ấy có buồn không!"
     sentence = "Tôi anh ách lo lắng! Mái, nhanh nhách, rau, tay, quay, con!!"
-    sentence = "ong-óc mong móc móp, quyết, chuyện, anh, con, chuyện, oanh, ươn, uyên"
+    sentence = "ong-óc mong móc móp, quyết, chuyện, anh, con, chuyện, oanh, ươn, enh"
     result = phonemize_with_punctuation(sentence)
 
     print("Câu gốc            : " + sentence)
